@@ -16,10 +16,15 @@ class GeneratePostView(APIView):
         platform = serializer.validated_data["platform"]
 
         try:
-            content = generate_social_post(topic, platform)
+            result = generate_social_post(topic, platform)
         except Exception:
             return Response(
                 {"error": "Post generation failed. Check your API key and try again."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-        return Response({"content": content, "platform": platform})
+        return Response({
+            "platform": platform,
+            "content": result.content,
+            "hashtags": result.hashtags,
+            "character_count": result.character_count,
+        })

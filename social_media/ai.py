@@ -1,5 +1,6 @@
 from decouple import config
 from openai import OpenAI
+from pydantic import BaseModel
 
 PLATFORM_LIMITS = {
     "twitter": 280,
@@ -20,7 +21,13 @@ PLATFORM_TONE = {
 _client = OpenAI(api_key=config("OPENAI_API_KEY"))
 
 
-def generate_social_post(topic: str, platform: str) -> str:
+class PostOutput(BaseModel):
+    content: str
+    hashtags: list[str]
+    character_count: int
+
+
+def generate_social_post(topic: str, platform: str) -> PostOutput:
     if platform not in PLATFORM_LIMITS:
         raise ValueError(f"Unsupported platform: {platform}")
 
@@ -30,18 +37,25 @@ def generate_social_post(topic: str, platform: str) -> str:
     system_prompt = (
         f"You are a social media copywriter. Write a single {platform} post about the given topic. "
         f"Tone: {tone}. "
-        f"Hard limit: {limit} characters. "
-        f"Return only the post text — no explanations, no quotes, no labels."
+        f"Hard limit: {limit} characters for the content field. "
+        f"Return the full post text in 'content', a list of hashtags used in 'hashtags' "
+        f"(each starting with #), and the character count of the content in 'character_count'."
     )
 
-    response = _client.chat.completions.create(
+    response = _client.beta.chat.completions.parse(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": topic},
         ],
+        response_format=PostOutput,
         max_tokens=512,
     )
 
-    content = (response.choices[0].message.content or "").strip()
-    return content[:limit] if len(content) > limit else content
+    result = response.choices[0].message.parsed
+    # Always calculate character_count ourselves — models sometimes get it wrong
+    result.character_count = len(result.content)
+    if result.character_count > limit:
+        result.content = result.content[:limit]
+        result.character_count = limit
+    return result
