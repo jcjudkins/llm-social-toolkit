@@ -1,7 +1,7 @@
 import logging
 
+import anthropic
 from decouple import config
-from openai import OpenAI
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ PLATFORM_TONE = {
     "instagram": "engaging and visual, with relevant hashtags",
 }
 
-_client = OpenAI(api_key=config("OPENAI_API_KEY"))
+_client = anthropic.Anthropic(api_key=config("ANTHROPIC_API_KEY"))
 
 
 class PostOutput(BaseModel):
@@ -46,26 +46,26 @@ def generate_social_post(topic: str, platform: str) -> PostOutput:
         f"(each starting with #), and the character count of the content in 'character_count'."
     )
 
-    response = _client.beta.chat.completions.parse(
-        model="gpt-4o-mini",
+    response = _client.messages.parse(
+        model="claude-opus-4-6",
+        max_tokens=512,
+        system=system_prompt,
         messages=[
-            {"role": "system", "content": system_prompt},
             {"role": "user", "content": topic},
         ],
-        response_format=PostOutput,
-        max_tokens=512,
+        output_format=PostOutput,
     )
 
     usage = response.usage
     logger.info(
-        "[%s] prompt=%d completion=%d total=%d",
+        "[%s] input=%d output=%d total=%d",
         platform,
-        usage.prompt_tokens,
-        usage.completion_tokens,
-        usage.total_tokens,
+        usage.input_tokens,
+        usage.output_tokens,
+        usage.input_tokens + usage.output_tokens,
     )
 
-    result = response.choices[0].message.parsed
+    result = response.parsed_output
     # Always calculate character_count ourselves — models sometimes get it wrong
     result.character_count = len(result.content)
     if result.character_count > limit:
