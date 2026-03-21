@@ -1,9 +1,35 @@
+from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from .ai import generate_social_post
+from .ai import PLATFORM_LIMITS, generate_social_post
 from .serializers import GeneratePostSerializer
+
+
+def generate_post_page(request):
+    platforms = list(PLATFORM_LIMITS.keys())
+    result = None
+    error = None
+    topic = ""
+    platform = platforms[0]
+
+    if request.method == "POST":
+        topic = request.POST.get("topic", "").strip()
+        platform = request.POST.get("platform", platforms[0])
+        if topic and platform in PLATFORM_LIMITS:
+            try:
+                result = generate_social_post(topic, platform)
+            except Exception:
+                error = "Post generation failed. Check your API key and try again."
+
+    return render(request, "social_media/generate.html", {
+        "platforms": platforms,
+        "result": result,
+        "error": error,
+        "topic": topic,
+        "platform": platform,
+    })
 
 
 class GeneratePostView(APIView):
