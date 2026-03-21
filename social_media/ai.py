@@ -1,6 +1,10 @@
+import logging
+
 from decouple import config
 from openai import OpenAI
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 PLATFORM_LIMITS = {
     "twitter": 280,
@@ -50,6 +54,15 @@ def generate_social_post(topic: str, platform: str) -> PostOutput:
         ],
         response_format=PostOutput,
         max_tokens=512,
+    )
+
+    usage = response.usage
+    logger.info(
+        "[%s] prompt=%d completion=%d total=%d",
+        platform,
+        usage.prompt_tokens,
+        usage.completion_tokens,
+        usage.total_tokens,
     )
 
     result = response.choices[0].message.parsed
