@@ -1,16 +1,18 @@
+from celery.result import AsyncResult
+from django.http import JsonResponse
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from .ai import PLATFORM_LIMITS, generate_social_post
+from .ai import PLATFORM_LIMITS
 from .serializers import GeneratePostSerializer
+from .tasks import generate_post_task
 
 
 def generate_post_page(request):
     platforms = list(PLATFORM_LIMITS.keys())
-    result = None
-    error = None
+    task_id = None
     topic = ""
     platform = platforms[0]
 
@@ -18,18 +20,24 @@ def generate_post_page(request):
         topic = request.POST.get("topic", "").strip()
         platform = request.POST.get("platform", platforms[0])
         if topic and platform in PLATFORM_LIMITS:
-            try:
-                result = generate_social_post(topic, platform)
-            except Exception:
-                error = "Post generation failed. Check your API key and try again."
+            task = generate_post_task.delay(topic, platform)
+            task_id = task.id
 
     return render(request, "social_media/generate.html", {
         "platforms": platforms,
-        "result": result,
-        "error": error,
+        "task_id": task_id,
         "topic": topic,
         "platform": platform,
     })
+
+
+def task_status(request, task_id):
+    result = AsyncResult(task_id)
+    if result.state == "SUCCESS":
+        return JsonResponse({"status": "SUCCESS", "result": result.get()})
+    if result.state == "FAILURE":
+        return JsonResponse({"status": "FAILURE", "error": str(result.result)})
+    return JsonResponse({"status": result.state})
 
 
 class GeneratePostView(APIView):

@@ -48,30 +48,66 @@
       </button>
     </form>
 
-    {% if error %}
-      <div class="mt-6 bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
-        {{ error }}
-      </div>
-    {% endif %}
-
-    {% if result %}
-      <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-gray-900">Generated Post</h2>
-          <span class="text-xs text-gray-500">{{ result.character_count }} chars</span>
+    <!-- Status / result area -->
+    <div id="output" class="mt-6">
+      {% if task_id %}
+        <div id="pending" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex items-center gap-3 text-gray-500 text-sm">
+          <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+          </svg>
+          Generating your post…
         </div>
-
-        <p class="text-gray-800 whitespace-pre-wrap">{{ result.content }}</p>
-
-        {% if result.hashtags %}
-          <div class="flex flex-wrap gap-2">
-            {% for tag in result.hashtags %}
-              <span class="bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-1 rounded">{{ tag }}</span>
-            {% endfor %}
+        <div id="result-card" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Generated Post</h2>
+            <span id="char-count" class="text-xs text-gray-500"></span>
           </div>
-        {% endif %}
-      </div>
-    {% endif %}
+          <p id="result-content" class="text-gray-800 whitespace-pre-wrap"></p>
+          <div id="hashtag-list" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div id="error-card" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm"></div>
+      {% endif %}
+    </div>
   </div>
+
+  {% if task_id %}
+  <script>
+    const taskId = "{{ task_id }}";
+    const pollUrl = "/api/task/" + taskId + "/";
+
+    async function poll() {
+      const res = await fetch(pollUrl);
+      const data = await res.json();
+
+      if (data.status === "SUCCESS") {
+        document.getElementById("pending").classList.add("hidden");
+
+        const card = document.getElementById("result-card");
+        document.getElementById("result-content").textContent = data.result.content;
+        document.getElementById("char-count").textContent = data.result.character_count + " chars";
+
+        const tagList = document.getElementById("hashtag-list");
+        data.result.hashtags.forEach(tag => {
+          const span = document.createElement("span");
+          span.className = "bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-1 rounded";
+          span.textContent = tag;
+          tagList.appendChild(span);
+        });
+
+        card.classList.remove("hidden");
+      } else if (data.status === "FAILURE") {
+        document.getElementById("pending").classList.add("hidden");
+        const err = document.getElementById("error-card");
+        err.textContent = data.error || "Post generation failed. Check your API key and try again.";
+        err.classList.remove("hidden");
+      } else {
+        setTimeout(poll, 1000);
+      }
+    }
+
+    poll();
+  </script>
+  {% endif %}
 </body>
 </html>
