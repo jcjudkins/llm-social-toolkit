@@ -17,14 +17,7 @@ PLATFORM_TONE = {
     "instagram": "engaging and visual, with relevant hashtags",
 }
 
-_client = None
-
-
-def _get_client():
-    global _client
-    if _client is None:
-        _client = OpenAI(api_key=config("OPENAI_API_KEY"))
-    return _client
+_client = OpenAI(api_key=config("OPENAI_API_KEY"))
 
 
 def generate_social_post(topic: str, platform: str) -> str:
@@ -41,7 +34,7 @@ def generate_social_post(topic: str, platform: str) -> str:
         f"Return only the post text — no explanations, no quotes, no labels."
     )
 
-    response = _get_client().chat.completions.create(
+    response = _client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": system_prompt},
@@ -50,4 +43,5 @@ def generate_social_post(topic: str, platform: str) -> str:
         max_tokens=512,
     )
 
-    return response.choices[0].message.content.strip()
+    content = (response.choices[0].message.content or "").strip()
+    return content[:limit] if len(content) > limit else content
