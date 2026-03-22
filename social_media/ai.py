@@ -1,7 +1,7 @@
 import logging
 
-import anthropic
 from decouple import config
+from openai import OpenAI
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,26 @@ PLATFORM_TONE = {
     "instagram": "engaging and visual, with relevant hashtags",
 }
 
-_client = anthropic.Anthropic(api_key=config("ANTHROPIC_API_KEY"))
+class ProviderNotConfiguredError(RuntimeError):
+    """Raised when an LLM provider is selected but required credentials are missing."""
+
+
+_client: OpenAI | None = None
+
+
+def _get_client() -> OpenAI:
+    global _client
+    if _client is not None:
+        return _client
+
+    api_key = config("OPENAI_API_KEY", default="").strip()
+    if not api_key:
+        raise ProviderNotConfiguredError(
+            "OPENAI_API_KEY is not configured. Add it to your environment or .env file."
+        )
+
+    _client = OpenAI(api_key=api_key)
+    return _client
 
 
 class PostOutput(BaseModel):
@@ -46,27 +65,27 @@ def generate_social_post(topic: str, platform: str) -> PostOutput:
         f"(each starting with #), and the character count of the content in 'character_count'."
     )
 
-    response = _client.messages.parse(
-        model="claude-opus-4-6",
-        max_tokens=512,
-        system=system_prompt,
+    client = _get_client()
+    response = client.beta.chat.completions.parse(
+        model=config("OPENAI_MODEL", default="gpt-4o-mini"),
         messages=[
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": topic},
         ],
-        output_format=PostOutput,
+        response_format=PostOutput,
     )
 
     usage = response.usage
     logger.info(
         "[%s] input=%d output=%d total=%d",
         platform,
-        usage.input_tokens,
-        usage.output_tokens,
-        usage.input_tokens + usage.output_tokens,
+        usage.prompt_tokens,
+        usage.completion_tokens,
+        usage.total_tokens,
     )
 
-    result = response.parsed_output
-    # Always calculate character_count ourselves — models sometimes get it wrong
+    result = response.choices[0].message.parsed
+    # Always calculate character_count ourselves because model metadata can drift.
     result.character_count = len(result.content)
     if result.character_count > limit:
         result.content = result.content[:limit]

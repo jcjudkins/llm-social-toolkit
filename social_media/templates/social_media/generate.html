@@ -65,6 +65,7 @@
           </div>
           <p id="result-content" class="text-gray-800 whitespace-pre-wrap"></p>
           <div id="hashtag-list" class="flex flex-wrap gap-2"></div>
+          <pre id="raw-result" class="hidden text-xs text-gray-500 bg-gray-50 rounded-lg p-3 overflow-auto"></pre>
         </div>
         <div id="error-card" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm"></div>
       {% endif %}
@@ -77,23 +78,45 @@
     const pollUrl = "/api/task/" + taskId + "/";
 
     async function poll() {
-      const res = await fetch(pollUrl);
-      const data = await res.json();
+      let data;
+      try {
+        const res = await fetch(pollUrl);
+        data = await res.json();
+      } catch (error) {
+        setTimeout(poll, 1000);
+        return;
+      }
 
       if (data.status === "SUCCESS") {
         document.getElementById("pending").classList.add("hidden");
 
         const card = document.getElementById("result-card");
-        document.getElementById("result-content").textContent = data.result.content;
-        document.getElementById("char-count").textContent = data.result.character_count + " chars";
+        const result = data.result || {};
+        const content = result.content || "";
+        const hashtags = Array.isArray(result.hashtags) ? result.hashtags : [];
+        const count = typeof result.character_count === "number"
+          ? result.character_count
+          : content.length;
+
+        document.getElementById("result-content").textContent = content || "(No content returned)";
+        document.getElementById("char-count").textContent = count + " chars";
 
         const tagList = document.getElementById("hashtag-list");
-        data.result.hashtags.forEach(tag => {
-          const span = document.createElement("span");
-          span.className = "bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-1 rounded";
-          span.textContent = tag;
-          tagList.appendChild(span);
+        tagList.innerHTML = "";
+        hashtags.forEach(tag => {
+            const span = document.createElement("span");
+            span.className = "bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-1 rounded";
+            span.textContent = tag;
+            tagList.appendChild(span);
         });
+
+        const rawResult = document.getElementById("raw-result");
+        if (!content && hashtags.length === 0) {
+          rawResult.textContent = JSON.stringify(result, null, 2);
+          rawResult.classList.remove("hidden");
+        } else {
+          rawResult.classList.add("hidden");
+        }
 
         card.classList.remove("hidden");
       } else if (data.status === "FAILURE") {

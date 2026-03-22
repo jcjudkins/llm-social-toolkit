@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from .ai import PLATFORM_LIMITS
+from .ai import PLATFORM_LIMITS, ProviderNotConfiguredError, generate_social_post
 from .serializers import GeneratePostSerializer
 from .tasks import generate_post_task
 
@@ -51,6 +51,11 @@ class GeneratePostView(APIView):
 
         try:
             result = generate_social_post(topic, platform)
+        except ProviderNotConfiguredError as exc:
+            return Response(
+                {"error": str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         except Exception:
             return Response(
                 {"error": "Post generation failed. Check your API key and try again."},
