@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Social Post Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen py-12">
+  <div class="max-w-2xl mx-auto px-4">
+    <h1 class="text-3xl font-bold text-gray-900 mb-8">Social Post Generator</h1>
+
+    <form method="post" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
+      {% csrf_token %}
+
+      <div>
+        <label for="topic" class="block text-sm font-medium text-gray-700 mb-1">Topic</label>
+        <textarea
+          id="topic"
+          name="topic"
+          rows="3"
+          required
+          placeholder="What should the post be about?"
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >{{ topic }}</textarea>
+      </div>
+
+      <div>
+        <label for="platform" class="block text-sm font-medium text-gray-700 mb-1">Platform</label>
+        <select
+          id="platform"
+          name="platform"
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          {% for p in platforms %}
+            <option value="{{ p }}" {% if p == platform %}selected{% endif %}>
+              {{ p|capfirst }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button
+        type="submit"
+        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors"
+      >
+        Generate Post
+      </button>
+    </form>
+
+    <!-- Status / result area -->
+    <div id="output" class="mt-6">
+      {% if task_id %}
+        <div id="pending" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex items-center gap-3 text-gray-500 text-sm">
+          <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+          </svg>
+          Generating your post…
+        </div>
+        <div id="result-card" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Generated Post</h2>
+            <span id="char-count" class="text-xs text-gray-500"></span>
+          </div>
+          <p id="result-content" class="text-gray-800 whitespace-pre-wrap"></p>
+          <div id="hashtag-list" class="flex flex-wrap gap-2"></div>
+          <pre id="raw-result" class="hidden text-xs text-gray-500 bg-gray-50 rounded-lg p-3 overflow-auto"></pre>
+        </div>
+        <div id="error-card" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm"></div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if task_id %}
+  <script>
+    const taskId = "{{ task_id }}";
+    const pollUrl = "/api/task/" + taskId + "/";
+
+    async function poll() {
+      let data;
+      try {
+        const res = await fetch(pollUrl);
+        data = await res.json();
+      } catch (error) {
+        setTimeout(poll, 1000);
+        return;
+      }
+
+      if (data.status === "SUCCESS") {
+        document.getElementById("pending").classList.add("hidden");
+
+        const card = document.getElementById("result-card");
+        const result = data.result || {};
+        const content = result.content || "";
+        const hashtags = Array.isArray(result.hashtags) ? result.hashtags : [];
+        const count = typeof result.character_count === "number"
+          ? result.character_count
+          : content.length;
+
+        document.getElementById("result-content").textContent = content || "(No content returned)";
+        document.getElementById("char-count").textContent = count + " chars";
+
+        const tagList = document.getElementById("hashtag-list");
+        tagList.innerHTML = "";
+        hashtags.forEach(tag => {
+            const span = document.createElement("span");
+            span.className = "bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-1 rounded";
+            span.textContent = tag;
+            tagList.appendChild(span);
+        });
+
+        const rawResult = document.getElementById("raw-result");
+        if (!content && hashtags.length === 0) {
+          rawResult.textContent = JSON.stringify(result, null, 2);
+          rawResult.classList.remove("hidden");
+        } else {
+          rawResult.classList.add("hidden");
+        }
+
+        card.classList.remove("hidden");
+      } else if (data.status === "FAILURE") {
+        document.getElementById("pending").classList.add("hidden");
+        const err = document.getElementById("error-card");
+        err.textContent = data.error || "Post generation failed. Check your API key and try again.";
+        err.classList.remove("hidden");
+      } else {
+        setTimeout(poll, 1000);
+      }
+    }
+
+    poll();
+  </script>
+  {% endif %}
+</body>
+</html>

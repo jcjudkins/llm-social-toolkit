@@ -26,7 +26,7 @@ Proven patterns here get ported back into a [private social media automation too
 1. **OpenAI request/response loop** — get comfortable with the basics
 2. **Prompt engineering** — tone and format differences across platforms
 3. **Structured outputs** — return JSON (`content`, `hashtags`, `character_count`)
-4. **Provider comparison** — OpenAI vs Anthropic Claude vs Groq (Llama 3)
+4. **Provider comparison** — compare prompt behavior and outputs across models/providers over time
 5. **Cost tracking** — log token usage per request
 6. **Basic web UI** — Django templates, no React needed
 7. **Async generation** — Celery task so slow API calls don't block the view
@@ -38,8 +38,8 @@ Proven patterns here get ported back into a [private social media automation too
 | Layer | Choice |
 |---|---|
 | Framework | Django 5.x + Django REST Framework |
-| LLM | OpenAI SDK (`gpt-4o-mini` default — cheap for dev) |
-| Auth | JWT via `djangorestframework-simplejwt` |
+| LLM | OpenAI SDK (`gpt-4o-mini`) |
+| Auth | None currently (JWT package installed for future use) |
 | Database | SQLite (zero config) |
 | Config | `python-decouple` |
 
@@ -56,7 +56,7 @@ pip install -r requirements.txt
 
 # 2. Environment
 cp .env.example .env
-# Add your OPENAI_API_KEY to .env
+# Fill in values in .env (SECRET_KEY is required; OPENAI_API_KEY is needed for AI generation)
 
 # 3. Database
 python manage.py migrate
@@ -68,9 +68,14 @@ python manage.py runserver
 ### Environment variables
 
 ```env
-SECRET_KEY=        # Django secret key
-OPENAI_API_KEY=    # platform.openai.com/api-keys
+SECRET_KEY=replace-me-with-a-long-random-string
+DEBUG=True
+REDIS_URL=redis://localhost:6379/0
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
 ```
+
+Use `.env.example` as the source of truth for local setup and keep real secrets only in `.env`.
 
 ---
 
@@ -91,10 +96,16 @@ OPENAI_API_KEY=    # platform.openai.com/api-keys
 
 ```json
 {
+  "platform": "twitter",
   "content": "Django 5.1 is here...",
-  "platform": "twitter"
+  "hashtags": ["#django", "#python"],
+  "character_count": 49
 }
 ```
+
+### `GET /api/task/<task_id>/`
+
+Returns Celery task status for the async web flow (`PENDING`, `SUCCESS`, `FAILURE`).
 
 ### Supported platforms
 
@@ -113,8 +124,8 @@ OPENAI_API_KEY=    # platform.openai.com/api-keys
 The LLM call lives in `social_media/ai.py`, isolated from views. Provider swaps are a one-file change.
 
 ```python
-# ai.py — the only file that knows about OpenAI
-def generate_social_post(topic: str, platform: str) -> str:
+# ai.py — the only file that knows about the LLM provider
+def generate_social_post(topic: str, platform: str) -> PostOutput:
     ...
 
 # views.py — calls the helper, doesn't care about the provider
@@ -136,7 +147,7 @@ Those live in the private automation tool. This repo is for LLM patterns only.
 
 ## Author
 
-**Jason Judkins** — DjangoCon US Marketing Chair, Django.social Raleigh/Durham organizer
+**Jason Judkins** — Full-stack developer building in public. Focused on Python, Django, and AI integration patterns.
 
 - 🌐 [judkins.dev](https://judkins.dev)
 - 🐦 [@jjudkins77](https://twitter.com/jjudkins77)
