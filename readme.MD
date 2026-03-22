@@ -147,7 +147,7 @@ Those live in the private automation tool. This repo is for LLM patterns only.
 
 ## Author
 
-**Jason Judkins** — DjangoCon US Marketing Chair, Django.social Raleigh/Durham organizer
+**Jason Judkins** — Full-stack developer building in public. Focused on Python, Django, and AI integration patterns.
 
 - 🌐 [judkins.dev](https://judkins.dev)
 - 🐦 [@jjudkins77](https://twitter.com/jjudkins77)
